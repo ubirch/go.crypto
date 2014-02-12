@@ -40,16 +40,17 @@ func (ks Keystore) Get(keyname string, kek []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	decodedKeyLen := len(decodedKey)
 
 	key := make([]byte, len(decodedKey)-8)
 	ret := aesUnwrapKeyWithpad(kek, key, decodedKey, uint(len(decodedKey)))
-	pad := ret % 8
+	pad := 8 - ret%8
 
 	if ret < 0 {
 		return nil, errors.New("failed to decrypt key")
 	}
 
-	if ret+8-pad != len(decodedKey)-8 {
+	if ret+pad != decodedKeyLen && ret+pad != decodedKeyLen-8 {
 		return nil, errors.New("failed to unwrap key")
 	}
 
