@@ -3,6 +3,7 @@ package keystore
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/base64"
 	"testing"
 )
 
@@ -129,7 +130,10 @@ func TestKeystoreRoundtrip(t *testing.T) {
 	testKek := []byte("Test kek, len 16")
 	testKey := []byte("I am an encrypted key.")
 
-	k := make(Keystore)
+	k := &Keystore {
+		make(map[string]string),
+		base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-."),
+	}
 	if _, err := k.Get("keyname", testKek); err == nil {
 		t.Errorf("Getting a non-existent key should fail")
 	}
@@ -143,7 +147,7 @@ func TestKeystoreRoundtrip(t *testing.T) {
 	if !bytes.Equal(have, testKey) {
 		t.Errorf("Key round trip failed, have %v, want %v", have, testKey)
 	}
-	delete(k, "keyname")
+	delete(k.KS, "keyname")
 	if _, err := k.Get("keyname", testKek); err == nil {
 		t.Errorf("Getting a deleted key should fail")
 	}
@@ -160,7 +164,10 @@ func TestKeystoreGetError(t *testing.T) {
 		{keyname: "present", kek: []byte("012345678901234-")},
 	}
 
-	k := make(Keystore)
+	k := &Keystore {
+		make(map[string]string),
+		base64.StdEncoding,
+	}
 	if err := k.Set("present", []byte("test"), []byte("0123456789012345")); err != nil {
 		t.Fatalf("Failed to set up keystore Get error test case: %v", err)
 	}
@@ -183,7 +190,10 @@ func TestKeystoreSetError(t *testing.T) {
 		{keyname: "present", keyvalue: []byte("some key"), kek: []byte("this key is not 16 bytes long")},
 	}
 
-	k := make(Keystore)
+	k := &Keystore{
+		make(map[string]string),
+		base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"),
+	}
 	for _, tt := range setErr {
 		if err := k.Set(tt.keyname, tt.keyvalue, tt.kek); err == nil {
 			t.Errorf("Expected an error setting %q %q %q, got none", tt.keyname, string(tt.keyvalue), string(tt.kek))

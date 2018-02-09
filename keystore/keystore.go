@@ -10,22 +10,23 @@ import (
 	"fmt"
 )
 
-// Base64Encoding to use when reading from or writing to
-// a Keystore. Most clients will not need to change this.
-var Base64Encoding = base64.StdEncoding
-
 var (
 	defaultIV   = []byte{0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6}
 	alternateIV = []byte{0xA6, 0x59, 0x59, 0xA6}
 )
 
-// Keystore stores encrypted keys. The map is keyed by key name;
+// Keystore stores encrypted keys and encoding. The map is keyed by key name;
 // value are encrypted, base64-encoded keys.
-type Keystore map[string]string
+type Keystore struct {
+	KS map[string]string
+	// Base64Encoding to use when reading from or writing to
+	// a Keystore. Most clients will use base64.StdEncoding.
+	Base64Encoding *base64.Encoding
+}
 
 // Get gets a key from the Keystore. kek is the key encrypting key.
-func (ks Keystore) Get(keyname string, kek []byte) ([]byte, error) {
-	encryptedKey, keyPresent := ks[keyname]
+func (ks *Keystore) Get(keyname string, kek []byte) ([]byte, error) {
+	encryptedKey, keyPresent := ks.KS[keyname]
 
 	switch {
 	case len(keyname) == 0:
@@ -36,7 +37,7 @@ func (ks Keystore) Get(keyname string, kek []byte) ([]byte, error) {
 		return nil, fmt.Errorf("invalid kek length (%d), must be 16", len(kek))
 	}
 
-	decodedKey, err := Base64Encoding.DecodeString(encryptedKey)
+	decodedKey, err := ks.Base64Encoding.DecodeString(encryptedKey)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +59,7 @@ func (ks Keystore) Get(keyname string, kek []byte) ([]byte, error) {
 }
 
 // Set sets a key in the Keystore. kek is the key encrypting key.
-func (ks Keystore) Set(keyname string, keyvalue []byte, kek []byte) error {
+func (ks *Keystore) Set(keyname string, keyvalue []byte, kek []byte) error {
 	switch {
 	case len(keyname) == 0:
 		return errors.New("empty keyname")
@@ -79,8 +80,8 @@ func (ks Keystore) Set(keyname string, keyvalue []byte, kek []byte) error {
 	if ret != keylen+8 {
 		return errors.New("unable to wrap key")
 	}
-	encodedKey := Base64Encoding.EncodeToString(encryptedKey)
-	ks[keyname] = encodedKey
+	encodedKey := ks.Base64Encoding.EncodeToString(encryptedKey)
+	ks.KS[keyname] = encodedKey
 	return nil
 }
 
