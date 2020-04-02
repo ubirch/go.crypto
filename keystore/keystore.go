@@ -34,7 +34,7 @@ func (ks *Keystore) Get(keyname string, kek []byte) ([]byte, error) {
 	case !keyPresent:
 		return nil, errors.New("key not found")
 	case len(kek) != 16:
-		return nil, fmt.Errorf("invalid kek length (%d), must be 16", len(kek))
+		return nil, errors.New(fmt.Sprintf("invalid kek length (%d), must be 16", len(kek)))
 	}
 
 	decodedKey, err := ks.Base64Encoding.DecodeString(encryptedKey)
@@ -43,8 +43,8 @@ func (ks *Keystore) Get(keyname string, kek []byte) ([]byte, error) {
 	}
 	decodedKeyLen := len(decodedKey)
 
-	key := make([]byte, len(decodedKey)-8)
-	ret := aesUnwrapKeyWithpad(kek, key, decodedKey, uint(len(decodedKey)))
+	key := make([]byte, decodedKeyLen)
+	ret := aesUnwrapKeyWithpad(kek, key, decodedKey, uint(decodedKeyLen))
 	pad := 8 - ret%8
 
 	if ret < 0 {
@@ -66,17 +66,16 @@ func (ks *Keystore) Set(keyname string, keyvalue []byte, kek []byte) error {
 	case keyvalue == nil:
 		return errors.New("nil keyvalue")
 	case len(kek) != 16:
-		return fmt.Errorf("invalid kek length (%d), must be 16", len(kek))
+		return errors.New(fmt.Sprintf("invalid kek length (%d), must be 16", len(kek)))
 	}
 
 	klen := len(keyvalue)
-	var keylen int
+	var keylen = klen
 	if pad := klen % 8; pad != 0 {
 		keylen = klen + 8 - pad
 	}
 	encryptedKey := make([]byte, keylen+8)
 	ret := aesWrapKeyWithpad(kek, encryptedKey, keyvalue, uint(klen))
-
 	if ret != keylen+8 {
 		return errors.New("unable to wrap key")
 	}

@@ -4,7 +4,11 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
+	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // RFC test vectors
@@ -130,7 +134,7 @@ func TestKeystoreRoundtrip(t *testing.T) {
 	testKek := []byte("Test kek, len 16")
 	testKey := []byte("I am an encrypted key.")
 
-	k := &Keystore {
+	k := &Keystore{
 		make(map[string]string),
 		base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-."),
 	}
@@ -153,6 +157,78 @@ func TestKeystoreRoundtrip(t *testing.T) {
 	}
 }
 
+func TestKeystoreRoundtrip2(t *testing.T) {
+	var tests = []struct {
+		testName string
+		keyname  string
+		keyvalue []byte
+		kek      []byte
+	}{
+		{testName: "8ByteKey", keyname: "8ByteKey", keyvalue: []byte("12345678"), kek: []byte("0123456789ABCDEF")},
+		{testName: "16ByteKey", keyname: "16ByteKey", keyvalue: []byte("16 Byte long key"), kek: []byte("16 Byte long kek")},
+		{testName: "7ByteKey", keyname: "7ByteKey", keyvalue: []byte("1234567"), kek: []byte("0123456789ABCDEF")},
+		{testName: "9ByteKey", keyname: "9ByteKey", keyvalue: []byte("123456789"), kek: []byte("0123456789ABCDEF")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testName, func(t *testing.T) {
+			k := &Keystore{
+				make(map[string]string),
+				base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"),
+			}
+			nilKey, err := k.Get(tt.keyname, tt.kek)
+			assert.Errorf(t, err, "Getting a non-existent key should fail")
+			assert.Nilf(t, nilKey, "Non existing key shold be 'Nil'")
+
+			assert.NoErrorf(t, k.Set(tt.keyname, tt.keyvalue, tt.kek),
+				"Failed to set key: %v", err)
+			have, err := k.Get(tt.keyname, tt.kek)
+			assert.NoErrorf(t, err, "Failed to get key: %v", err)
+			assert.NotNilf(t, have, "Existing key should not be 'Nil")
+			assert.Equalf(t, have, tt.keyvalue,
+				"Key round trip failed, have %v, want %v", have, tt.keyvalue)
+
+			delete(k.KS, tt.keyname)
+			deletedKey, err := k.Get(tt.keyname, tt.kek)
+			assert.Errorf(t, err, "Getting a deleted key should fail")
+			assert.Nilf(t, deletedKey, "Deleted key  shold be 'Nil'")
+		})
+	}
+}
+
+func TestKeystoreRoundtripRandom(t *testing.T) {
+	var l uint = 256
+	kek := []byte("0123456789ABCDEF")
+
+	randKey := make([]byte, l)
+	for i := uint(1); i < l; i++ {
+		_, err := rand.Read(randKey)
+		require.NoErrorf(t, err, "Random number did not work")
+		testName := fmt.Sprintf("%03v Bytes", i)
+		t.Run(testName, func(t *testing.T) {
+			k := &Keystore{
+				make(map[string]string),
+				base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"),
+			}
+			nilKey, err := k.Get("keyname", kek)
+			assert.Errorf(t, err, "Getting a non-existent key should fail")
+			assert.Nilf(t, nilKey, "Non existing key shold be 'Nil'")
+
+			assert.NoErrorf(t, k.Set("keyname", randKey[:i], kek),
+				"Failed to set key: %v", err)
+			have, err := k.Get("keyname", kek)
+			assert.NoErrorf(t, err, "Failed to get key: %v", err)
+			assert.NotNilf(t, have, "Existing key should not be 'Nil")
+			assert.Equalf(t, have, randKey[:i],
+				"Key round trip failed, have %v, want %v", have, randKey[:i])
+
+			delete(k.KS, "keyname")
+			deletedKey, err := k.Get("keyname", kek)
+			assert.Errorf(t, err, "Getting a deleted key should fail")
+			assert.Nilf(t, deletedKey, "Deleted key  shold be 'Nil'")
+		})
+	}
+}
+
 func TestKeystoreGetError(t *testing.T) {
 	getErr := []struct {
 		keyname string
@@ -164,7 +240,7 @@ func TestKeystoreGetError(t *testing.T) {
 		{keyname: "present", kek: []byte("012345678901234-")},
 	}
 
-	k := &Keystore {
+	k := &Keystore{
 		make(map[string]string),
 		base64.StdEncoding,
 	}
@@ -176,6 +252,28 @@ func TestKeystoreGetError(t *testing.T) {
 		if _, err := k.Get(tt.keyname, tt.kek); err == nil {
 			t.Errorf("Expected an error getting %q %q, got none", tt.keyname, string(tt.kek))
 		}
+	}
+}
+
+func TestKeystoreSet(t *testing.T) {
+	setErr := []struct {
+		keyname  string
+		keyvalue []byte
+		kek      []byte
+	}{
+		{keyname: "16ByteKey", keyvalue: []byte("16 Byte long key"), kek: []byte("16 Byte long kek")},
+		{keyname: "8ByteKey", keyvalue: []byte("12345678"), kek: []byte("0123456789ABCDEF")},
+		{keyname: "7ByteKey", keyvalue: []byte("1234567"), kek: []byte("0123456789ABCDEF")},
+		{keyname: "9ByteKey", keyvalue: []byte("123456789"), kek: []byte("0123456789ABCDEF")},
+	}
+
+	k := &Keystore{
+		make(map[string]string),
+		base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"),
+	}
+	for _, tt := range setErr {
+		assert.NoErrorf(t, k.Set(tt.keyname, tt.keyvalue, tt.kek),
+			"Expected no error getting %q %q, got one", tt.keyname, string(tt.kek))
 	}
 }
 
@@ -204,7 +302,8 @@ func TestKeystoreSetError(t *testing.T) {
 func TestWrapRandom(t *testing.T) {
 	sample := make([]byte, 100)
 	for i := uint(1); i < 100; i++ {
-		rand.Read(sample)
+		_, err := rand.Read(sample)
+		require.NoErrorf(t, err, "Random number did not work")
 		pass := aesWrapUnwrapTest(kek[:16], nil, nil, sample[:i], i)
 		if !pass {
 			t.Errorf("Random data of len %d failed wrap unwrap test", i)
@@ -218,7 +317,8 @@ func TestLargeKey(t *testing.T) {
 	kek := make([]byte, 16)
 	key := make([]byte, 8192)
 	for i := 128; i <= len(key); i *= 2 {
-		rand.Read(key)
+		_, err := rand.Read(key)
+		require.NoErrorf(t, err, "Random number did not work")
 		pass := aesWrapUnwrapTest(kek, nil, nil, key[:i], uint(i))
 		if !pass {
 			t.Errorf("Random key data of len %d failed wrap unwrap test", i)
