@@ -3,7 +3,6 @@ package keystore
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -134,10 +133,7 @@ func TestKeystoreRoundtrip(t *testing.T) {
 	testKek := []byte("Test kek, len 16")
 	testKey := []byte("I am an encrypted key.")
 
-	k := &Keystore{
-		make(map[string]string),
-		base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-."),
-	}
+	k := make(Keystore)
 	if _, err := k.Get("keyname", testKek); err == nil {
 		t.Errorf("Getting a non-existent key should fail")
 	}
@@ -151,7 +147,7 @@ func TestKeystoreRoundtrip(t *testing.T) {
 	if !bytes.Equal(have, testKey) {
 		t.Errorf("Key round trip failed, have %v, want %v", have, testKey)
 	}
-	delete(k.KS, "keyname")
+	delete(k, "keyname")
 	if _, err := k.Get("keyname", testKek); err == nil {
 		t.Errorf("Getting a deleted key should fail")
 	}
@@ -171,10 +167,7 @@ func TestKeystoreRoundtrip2(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.testName, func(t *testing.T) {
-			k := &Keystore{
-				make(map[string]string),
-				base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"),
-			}
+			k := make(Keystore)
 			nilKey, err := k.Get(tt.keyname, tt.kek)
 			assert.Errorf(t, err, "Getting a non-existent key should fail")
 			assert.Nilf(t, nilKey, "Non existing key shold be 'Nil'")
@@ -187,7 +180,7 @@ func TestKeystoreRoundtrip2(t *testing.T) {
 			assert.Equalf(t, have, tt.keyvalue,
 				"Key round trip failed, have %v, want %v", have, tt.keyvalue)
 
-			delete(k.KS, tt.keyname)
+			delete(k, tt.keyname)
 			deletedKey, err := k.Get(tt.keyname, tt.kek)
 			assert.Errorf(t, err, "Getting a deleted key should fail")
 			assert.Nilf(t, deletedKey, "Deleted key  shold be 'Nil'")
@@ -205,10 +198,7 @@ func TestKeystoreRoundtripRandom(t *testing.T) {
 		require.NoErrorf(t, err, "Random number did not work")
 		testName := fmt.Sprintf("%03v Bytes", i)
 		t.Run(testName, func(t *testing.T) {
-			k := &Keystore{
-				make(map[string]string),
-				base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"),
-			}
+			k := make(Keystore)
 			nilKey, err := k.Get("keyname", kek)
 			assert.Errorf(t, err, "Getting a non-existent key should fail")
 			assert.Nilf(t, nilKey, "Non existing key shold be 'Nil'")
@@ -221,7 +211,7 @@ func TestKeystoreRoundtripRandom(t *testing.T) {
 			assert.Equalf(t, have, randKey[:i],
 				"Key round trip failed, have %v, want %v", have, randKey[:i])
 
-			delete(k.KS, "keyname")
+			delete(k, "keyname")
 			deletedKey, err := k.Get("keyname", kek)
 			assert.Errorf(t, err, "Getting a deleted key should fail")
 			assert.Nilf(t, deletedKey, "Deleted key  shold be 'Nil'")
@@ -240,10 +230,7 @@ func TestKeystoreGetError(t *testing.T) {
 		{keyname: "present", kek: []byte("012345678901234-")},
 	}
 
-	k := &Keystore{
-		make(map[string]string),
-		base64.StdEncoding,
-	}
+	k := make(Keystore)
 	if err := k.Set("present", []byte("test"), []byte("0123456789012345")); err != nil {
 		t.Fatalf("Failed to set up keystore Get error test case: %v", err)
 	}
@@ -267,10 +254,7 @@ func TestKeystoreSet(t *testing.T) {
 		{keyname: "9ByteKey", keyvalue: []byte("123456789"), kek: []byte("0123456789ABCDEF")},
 	}
 
-	k := &Keystore{
-		make(map[string]string),
-		base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"),
-	}
+	k := make(Keystore)
 	for _, tt := range setErr {
 		assert.NoErrorf(t, k.Set(tt.keyname, tt.keyvalue, tt.kek),
 			"Expected no error getting %q %q, got one", tt.keyname, string(tt.kek))
@@ -288,10 +272,7 @@ func TestKeystoreSetError(t *testing.T) {
 		{keyname: "present", keyvalue: []byte("some key"), kek: []byte("this key is not 16 bytes long")},
 	}
 
-	k := &Keystore{
-		make(map[string]string),
-		base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"),
-	}
+	k := make(Keystore)
 	for _, tt := range setErr {
 		if err := k.Set(tt.keyname, tt.keyvalue, tt.kek); err == nil {
 			t.Errorf("Expected an error setting %q %q %q, got none", tt.keyname, string(tt.keyvalue), string(tt.kek))
